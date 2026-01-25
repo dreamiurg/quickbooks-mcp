@@ -2,6 +2,16 @@
 
 // QuickBooks MCP Server - Entry Point
 
+// Load .env file from the package directory (workaround for Claude Code env var bug)
+import { config } from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Look for .env in the package root (one level up from dist/)
+config({ path: join(__dirname, "..", ".env") });
+
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
 

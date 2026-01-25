@@ -2,6 +2,27 @@
 
 export const toolDefinitions = [
   {
+    name: "qbo_authenticate",
+    description: "Authenticate with QuickBooks using OAuth (local credential mode only). " +
+      "Step 1: Call with no arguments to get the authorization URL. " +
+      "Step 2: After authorizing in browser, call with authorization_code and realm_id from the callback URL. " +
+      "This tool only works when QBO_CREDENTIAL_MODE is 'local' (the default).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        authorization_code: {
+          type: "string",
+          description: "Authorization code from the QuickBooks OAuth callback URL (the 'code' parameter)",
+        },
+        realm_id: {
+          type: "string",
+          description: "Company/realm ID from the callback URL (the 'realmId' parameter). Required when providing authorization_code.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_company_info",
     description: "Get information about the connected QuickBooks company.",
     inputSchema: {

@@ -21,6 +21,7 @@ import {
   handleEditSalesReceipt,
   handleGetDeposit,
   handleEditDeposit,
+  handleAuthenticate,
 } from "./handlers/index.js";
 
 export { toolDefinitions } from "./definitions.js";
@@ -56,6 +57,11 @@ export async function executeTool(
   name: string,
   args: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Special case: qbo_authenticate doesn't need a QuickBooks client
+  if (name === "qbo_authenticate") {
+    return handleAuthenticate(args as { authorization_code?: string; realm_id?: string });
+  }
+
   const handler = toolHandlers.get(name);
   if (!handler) {
     throw new Error(`Unknown tool: ${name}`);

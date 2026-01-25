@@ -1,7 +1,9 @@
 // QuickBooks client authentication and session management
 
 import QuickBooks from "node-quickbooks";
-import { getSecret, putSecret, getCompanyId, QBCredentials } from "../aws.js";
+import { getCredentialProvider, isLocalMode } from "../credentials/index.js";
+import type { QBCredentials, CredentialProvider } from "../credentials/index.js";
+import { refreshAccessToken } from "../credentials/oauth-client.js";
 import { promisify } from "./promisify.js";
 import { clearLookupCache } from "./cache.js";
 import { isQBError } from "../types/index.js";
@@ -13,6 +15,7 @@ const useSandbox = process.env.QBO_SANDBOX === "true";
 let qbo: QuickBooks | null = null;
 let credentials: QBCredentials | null = null;
 let companyId: string | null = null;
+let provider: CredentialProvider | null = null;
 
 // Export companyId getter for tools that need it
 export function getCompanyIdValue(): string | null {
@@ -37,12 +40,31 @@ export function isAuthError(error: unknown): boolean {
 
 // Initialize or refresh the QuickBooks session
 export async function getClient(): Promise<QuickBooks> {
-  // ALWAYS fetch fresh credentials from Secrets Manager (like Python version)
-  credentials = await getSecret();
+  // Get credential provider (singleton)
+  if (!provider) {
+    provider = getCredentialProvider();
+  }
 
-  // Load company ID from SSM if not cached
+  // Check if credentials are configured
+  const isConfigured = await provider.isConfigured();
+  if (!isConfigured) {
+    if (isLocalMode()) {
+      throw new Error(
+        "QuickBooks credentials not configured. Run the qbo_authenticate tool to set up OAuth."
+      );
+    } else {
+      throw new Error(
+        "QuickBooks credentials not found in AWS. Check your AWS Secrets Manager and SSM Parameter Store configuration."
+      );
+    }
+  }
+
+  // ALWAYS fetch fresh credentials from provider (like Python version)
+  credentials = await provider.getCredentials();
+
+  // Load company ID from provider if not cached
   if (!companyId) {
-    companyId = await getCompanyId();
+    companyId = await provider.getCompanyId();
   }
 
   // Create QuickBooks client with current tokens
@@ -60,15 +82,30 @@ export async function getClient(): Promise<QuickBooks> {
   );
 
   // Refresh the access token
-  const tokenInfo = await promisify<{
-    access_token: string;
-    refresh_token: string;
-  }>((cb) => qbo!.refreshAccessToken(cb));
+  try {
+    const tokenInfo = await promisify<{
+      access_token: string;
+      refresh_token: string;
+    }>((cb) => qbo!.refreshAccessToken(cb));
 
-  // Update credentials and persist to Secrets Manager immediately
-  credentials.access_token = tokenInfo.access_token;
-  credentials.refresh_token = tokenInfo.refresh_token;
-  await putSecret(credentials);
+    // Update credentials and persist to provider immediately
+    credentials.access_token = tokenInfo.access_token;
+    credentials.refresh_token = tokenInfo.refresh_token;
+    await provider.saveCredentials(credentials);
+  } catch (refreshError) {
+    // For local mode, try using intuit-oauth for refresh as a fallback
+    if (isLocalMode()) {
+      try {
+        credentials = await refreshAccessToken(credentials);
+        await provider.saveCredentials(credentials);
+      } catch (fallbackError) {
+        // If both methods fail, throw the original error
+        throw refreshError;
+      }
+    } else {
+      throw refreshError;
+    }
+  }
 
   // Recreate client with new tokens
   qbo = new QuickBooks(
