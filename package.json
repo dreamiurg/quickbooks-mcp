@@ -1,11 +1,27 @@
 {
   "name": "quickbooks-mcp",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "MCP server for QuickBooks Online API integration",
+  "license": "MIT",
+  "mcpName": "io.github.laf-rge/quickbooks-mcp",
+  "author": "laf-rge",
+  "homepage": "https://github.com/laf-rge/quickbooks-mcp",
+  "bugs": "https://github.com/laf-rge/quickbooks-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laf-rge/quickbooks-mcp.git"
+  },
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "quickbooks-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "start": "node dist/index.js",
     "dev": "tsc --watch"
   },
@@ -13,9 +29,9 @@
     "mcp",
     "quickbooks",
     "api",
-    "accounting"
+    "accounting",
+    "model-context-protocol"
   ],
-  "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.700.0",
     "@aws-sdk/client-ssm": "^3.700.0",
