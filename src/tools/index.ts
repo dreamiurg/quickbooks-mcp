@@ -13,6 +13,7 @@ import {
   handleCreateJournalEntry,
   handleGetJournalEntry,
   handleEditJournalEntry,
+  handleCreateBill,
   handleGetBill,
   handleEditBill,
   handleGetExpense,
@@ -43,6 +44,7 @@ toolHandlers.set("query_account_transactions", (client, args) => handleQueryAcco
 toolHandlers.set("create_journal_entry", (client, args) => handleCreateJournalEntry(client, args as Parameters<typeof handleCreateJournalEntry>[1]));
 toolHandlers.set("get_journal_entry", (client, args) => handleGetJournalEntry(client, args as { id: string }));
 toolHandlers.set("edit_journal_entry", (client, args) => handleEditJournalEntry(client, args as Parameters<typeof handleEditJournalEntry>[1]));
+toolHandlers.set("create_bill", (client, args) => handleCreateBill(client, args as Parameters<typeof handleCreateBill>[1]));
 toolHandlers.set("get_bill", (client, args) => handleGetBill(client, args as { id: string }));
 toolHandlers.set("edit_bill", (client, args) => handleEditBill(client, args as Parameters<typeof handleEditBill>[1]));
 toolHandlers.set("get_expense", (client, args) => handleGetExpense(client, args as { id: string }));

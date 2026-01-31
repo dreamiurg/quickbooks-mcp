@@ -85,6 +85,33 @@ The MCP edit tools (`edit_journal_entry`, `edit_bill`, `edit_expense`) automatic
 2. Copying the required fields to the update payload
 3. Applying only the requested changes
 
+## Expense (Purchase) Department Limitations
+
+### Single Department Per Expense
+
+QBO expenses (Purchases) support only **one department at the header level**. While the API schema includes `DepartmentRef` on line-level `AccountBasedExpenseLineDetail`, the API rejects attempts to set line-level departments when lines are added or modified (error: "failed to parse json object; a property specified is unsupported or invalid").
+
+This means an expense transaction **cannot be split across multiple departments**. If a single vendor charge covers multiple locations (e.g., a $59.98 SimpliSafe charge for two stores), it cannot be represented as one expense with two department-tagged lines.
+
+### Workarounds
+
+1. **Split Bills (preferred for recurring)**: Use the bill-splitting workflow in the frontend to create separate bills per department from a single vendor invoice. Each bill gets its own header-level department.
+
+2. **Reclassification Journal Entry (for corrections)**: When expenses are already recorded under the wrong department, create a JE to move the amounts:
+   - Debit the expense account in the correct department
+   - Credit the expense account in the incorrect department
+
+3. **Separate Expenses**: Manually create individual expense records per department (loses the connection to the single bank/card transaction).
+
+### edit_expense Full Update Bug (Known)
+
+When `edit_expense` modifies lines, it performs a full update (`sparse: false`) but does **not** copy the following header-level fields from the original:
+
+- `DepartmentRef` (location) — **gets stripped**
+- `EntityRef` (vendor/payee) — **gets stripped**
+
+This means any line edit on an expense will silently remove the department and vendor. Until this is fixed in the handler code, avoid using `edit_expense` for line modifications. Use JEs for reclassification instead.
+
 ## References
 
 - [Data Queries - Intuit Developer](https://developer.intuit.com/app/developer/qbo/docs/learn/explore-the-quickbooks-online-api/data-queries)

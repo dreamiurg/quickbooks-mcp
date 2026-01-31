@@ -315,6 +315,82 @@ export const toolDefinitions = [
     },
   },
   {
+    name: "create_bill",
+    description: "Create a vendor bill. Accepts vendor/account/department names (will lookup IDs automatically). Note: DepartmentRef is header-level only — for multi-department splits, create separate bills (one per department). Returns bill details and a link to view in QuickBooks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vendor_name: {
+          type: "string",
+          description: "Vendor display name (e.g., 'Simplisafe', 'PG&E'). Will be looked up to get ID.",
+        },
+        vendor_id: {
+          type: "string",
+          description: "Vendor ID (use if you already know it, otherwise use vendor_name)",
+        },
+        txn_date: {
+          type: "string",
+          description: "Transaction date in YYYY-MM-DD format",
+        },
+        due_date: {
+          type: "string",
+          description: "Due date in YYYY-MM-DD format (optional)",
+        },
+        department_name: {
+          type: "string",
+          description: "Header-level department/location name (e.g., '20358', 'Cotati'). Will be looked up to get ID.",
+        },
+        department_id: {
+          type: "string",
+          description: "Header-level department/location ID (use if you already know it, otherwise use department_name)",
+        },
+        ap_account: {
+          type: "string",
+          description: "Accounts Payable account name or number (optional, defaults to standard AP)",
+        },
+        memo: {
+          type: "string",
+          description: "Private memo for the bill",
+        },
+        doc_number: {
+          type: "string",
+          description: "Reference number for the bill (optional)",
+        },
+        lines: {
+          type: "array",
+          description: "Array of expense line items. Provide account_name OR account_id (name preferred).",
+          items: {
+            type: "object",
+            properties: {
+              account_name: {
+                type: "string",
+                description: "Account name (e.g., 'Alarm', '6123'). Will be looked up to get ID.",
+              },
+              account_id: {
+                type: "string",
+                description: "Account ID (use if you already know it, otherwise use account_name)",
+              },
+              amount: {
+                type: "number",
+                description: "Line amount (positive number)",
+              },
+              description: {
+                type: "string",
+                description: "Line description (optional)",
+              },
+            },
+            required: ["amount"],
+          },
+        },
+        draft: {
+          type: "boolean",
+          description: "If true, validate and show preview without creating (default: true)",
+        },
+      },
+      required: ["txn_date", "lines"],
+    },
+  },
+  {
     name: "get_bill",
     description: "Fetch a single bill by ID with full details including SyncToken (needed for edits). Returns vendor, date, due date, amount, AP account, line details.",
     inputSchema: {

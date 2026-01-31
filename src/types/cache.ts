@@ -30,3 +30,16 @@ export interface AccountCache {
   byAcctNum: Map<string, CachedAccount>;   // lowercase key
   fetchedAt: number;
 }
+
+export interface CachedVendor {
+  Id: string;
+  DisplayName: string;
+  Active?: boolean;
+}
+
+export interface VendorCache {
+  items: CachedVendor[];
+  byId: Map<string, CachedVendor>;
+  byName: Map<string, CachedVendor>;       // lowercase key
+  fetchedAt: number;
+}

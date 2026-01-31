@@ -11,6 +11,8 @@ export {
   clearLookupCache,
   getDepartmentCache,
   getAccountCache,
+  getVendorCache,
   resolveAccount,
+  resolveVendor,
   resolveDepartmentId,
 } from './cache.js';

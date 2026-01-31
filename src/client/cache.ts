@@ -5,8 +5,10 @@ import { promisify } from "./promisify.js";
 import {
   CachedAccount,
   CachedDepartment,
+  CachedVendor,
   AccountCache,
   DepartmentCache,
+  VendorCache,
   QBQueryResponse,
 } from "../types/index.js";
 
@@ -16,10 +18,12 @@ const LOOKUP_CACHE_TTL_MS = 15 * 60 * 1000;
 // Module-level cache state
 let departmentCache: DepartmentCache | null = null;
 let accountCache: AccountCache | null = null;
+let vendorCache: VendorCache | null = null;
 
 export function clearLookupCache(): void {
   departmentCache = null;
   accountCache = null;
+  vendorCache = null;
 }
 
 // Helper to extract entities from QB query response with type safety
@@ -94,6 +98,47 @@ export async function resolveAccount(client: QuickBooks, account: string): Promi
   if (byPartial) return byPartial;
 
   throw new Error(`Account not found: "${account}". Try using account name, number (AcctNum), or ID.`);
+}
+
+export async function getVendorCache(client: QuickBooks): Promise<VendorCache> {
+  if (vendorCache && (Date.now() - vendorCache.fetchedAt) < LOOKUP_CACHE_TTL_MS) {
+    return vendorCache;
+  }
+
+  const result = await promisify<unknown>((cb) => client.findVendors({ fetchAll: true }, cb));
+  const items = extractQueryResults<CachedVendor>(result, 'Vendor');
+
+  const byId = new Map<string, CachedVendor>();
+  const byName = new Map<string, CachedVendor>();
+  for (const vendor of items) {
+    byId.set(vendor.Id, vendor);
+    byName.set(vendor.DisplayName.toLowerCase(), vendor);
+  }
+
+  vendorCache = { items, byId, byName, fetchedAt: Date.now() };
+  return vendorCache;
+}
+
+// Resolve vendor by name or ID using cache
+// Returns { value, name } ref object for QuickBooks API
+export async function resolveVendor(client: QuickBooks, nameOrId: string): Promise<{ value: string; name: string }> {
+  const cache = await getVendorCache(client);
+
+  // Try exact ID match
+  const byId = cache.byId.get(nameOrId);
+  if (byId) return { value: byId.Id, name: byId.DisplayName };
+
+  // Try exact name match (case-insensitive)
+  const byName = cache.byName.get(nameOrId.toLowerCase());
+  if (byName) return { value: byName.Id, name: byName.DisplayName };
+
+  // Try partial name match
+  const byPartial = cache.items.find(v =>
+    v.DisplayName.toLowerCase().includes(nameOrId.toLowerCase())
+  );
+  if (byPartial) return { value: byPartial.Id, name: byPartial.DisplayName };
+
+  throw new Error(`Vendor not found: "${nameOrId}". Try using vendor display name or ID.`);
 }
 
 // Helper to resolve department name to ID using cache

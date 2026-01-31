@@ -1,12 +1,20 @@
-// Handlers for bill tools (get, edit)
+// Handlers for bill tools (create, get, edit)
 
 import QuickBooks from "node-quickbooks";
 import {
   promisify,
   getAccountCache,
   getDepartmentCache,
+  getVendorCache,
 } from "../../client/index.js";
-import { writeReport, validateAmount, toDollars } from "../../utils/index.js";
+import { writeReport, validateAmount, toDollars, formatDollars, sumCents } from "../../utils/index.js";
+
+interface CreateBillLine {
+  account_id?: string;
+  account_name?: string;
+  amount: number;
+  description?: string;
+}
 
 interface BillLineChange {
   line_id?: string;
@@ -15,6 +23,213 @@ interface BillLineChange {
   description?: string;
   department_name?: string;
   delete?: boolean;
+}
+
+export async function handleCreateBill(
+  client: QuickBooks,
+  args: {
+    vendor_name?: string;
+    vendor_id?: string;
+    txn_date: string;
+    due_date?: string;
+    department_name?: string;
+    department_id?: string;
+    ap_account?: string;
+    memo?: string;
+    doc_number?: string;
+    lines: CreateBillLine[];
+    draft?: boolean;
+  }
+): Promise<{ content: Array<{ type: string; text: string }> }> {
+  const {
+    vendor_name, vendor_id, txn_date, due_date,
+    department_name, department_id, ap_account,
+    memo, doc_number, lines, draft = true,
+  } = args;
+
+  if (!lines || lines.length === 0) {
+    throw new Error("At least one line is required");
+  }
+
+  // Get cached lookups
+  const [acctCache, deptCache, vendorCacheData] = await Promise.all([
+    getAccountCache(client),
+    getDepartmentCache(client),
+    getVendorCache(client),
+  ]);
+
+  // Resolve vendor
+  const resolveVendorRef = (nameOrId: string): { value: string; name: string } => {
+    const byId = vendorCacheData.byId.get(nameOrId);
+    if (byId) return { value: byId.Id, name: byId.DisplayName };
+
+    const byName = vendorCacheData.byName.get(nameOrId.toLowerCase());
+    if (byName) return { value: byName.Id, name: byName.DisplayName };
+
+    const byPartial = vendorCacheData.items.find(v =>
+      v.DisplayName.toLowerCase().includes(nameOrId.toLowerCase())
+    );
+    if (byPartial) return { value: byPartial.Id, name: byPartial.DisplayName };
+
+    throw new Error(`Vendor not found: "${nameOrId}"`);
+  };
+
+  let vendorRef: { value: string; name: string };
+  if (vendor_id) {
+    vendorRef = resolveVendorRef(vendor_id);
+  } else if (vendor_name) {
+    vendorRef = resolveVendorRef(vendor_name);
+  } else {
+    throw new Error("Either vendor_name or vendor_id is required");
+  }
+
+  // Resolve account refs
+  const lookupAccount = (name: string): { id: string; name: string; acctNum?: string } => {
+    let match = acctCache.byAcctNum.get(name.toLowerCase());
+    if (!match) match = acctCache.byName.get(name.toLowerCase());
+    if (!match) match = acctCache.items.find(a =>
+      a.FullyQualifiedName?.toLowerCase().includes(name.toLowerCase())
+    );
+    if (match) return { id: match.Id, name: match.FullyQualifiedName || match.Name, acctNum: match.AcctNum };
+    throw new Error(`Account not found: "${name}"`);
+  };
+
+  // Resolve department (header-level)
+  let departmentRef: { value: string; name: string } | undefined;
+  const deptInput = department_id || department_name;
+  if (deptInput) {
+    const byId = deptCache.byId.get(deptInput);
+    if (byId) {
+      departmentRef = { value: byId.Id, name: byId.FullyQualifiedName || byId.Name };
+    } else {
+      const byName = deptCache.byName.get(deptInput.toLowerCase());
+      if (byName) {
+        departmentRef = { value: byName.Id, name: byName.FullyQualifiedName || byName.Name };
+      } else {
+        const byPartial = deptCache.items.find(d =>
+          d.FullyQualifiedName?.toLowerCase().includes(deptInput.toLowerCase())
+        );
+        if (byPartial) {
+          departmentRef = { value: byPartial.Id, name: byPartial.FullyQualifiedName || byPartial.Name };
+        } else {
+          throw new Error(`Department not found: "${deptInput}"`);
+        }
+      }
+    }
+  }
+
+  // Resolve AP account if specified
+  let apAccountRef: { value: string; name: string } | undefined;
+  if (ap_account) {
+    const acct = lookupAccount(ap_account);
+    apAccountRef = { value: acct.id, name: acct.name };
+  }
+
+  // Resolve lines
+  const resolvedLines = lines.map((line) => {
+    let accountId = line.account_id;
+    let accountName = line.account_name;
+    let accountNum: string | undefined;
+
+    if (!accountId && accountName) {
+      const account = lookupAccount(accountName);
+      accountId = account.id;
+      accountName = account.name;
+      accountNum = account.acctNum;
+    } else if (!accountId && !accountName) {
+      throw new Error("Each line must have either account_id or account_name");
+    }
+
+    const amountCents = validateAmount(line.amount, `Line ${accountName || accountId}`);
+
+    return {
+      ...line,
+      account_id: accountId!,
+      account_name: accountName,
+      account_num: accountNum,
+      amount_cents: amountCents,
+      amount: toDollars(amountCents),
+    };
+  });
+
+  // Calculate total
+  const totalCents = sumCents(resolvedLines.map(l => l.amount_cents));
+
+  // Build QuickBooks Bill object
+  const billObject: Record<string, unknown> = {
+    VendorRef: vendorRef,
+    TxnDate: txn_date,
+    ...(due_date && { DueDate: due_date }),
+    ...(memo && { PrivateNote: memo }),
+    ...(doc_number && { DocNumber: doc_number }),
+    ...(departmentRef && { DepartmentRef: departmentRef }),
+    ...(apAccountRef && { APAccountRef: apAccountRef }),
+    Line: resolvedLines.map((line) => ({
+      Amount: line.amount,
+      DetailType: "AccountBasedExpenseLineDetail",
+      ...(line.description && { Description: line.description }),
+      AccountBasedExpenseLineDetail: {
+        AccountRef: {
+          value: line.account_id,
+          name: line.account_name,
+        },
+        BillableStatus: "NotBillable",
+      },
+    })),
+  };
+
+  if (draft) {
+    const formatAccount = (l: typeof resolvedLines[0]) => {
+      const num = l.account_num ? `${l.account_num} ` : "";
+      return `${num}${l.account_name || l.account_id}`;
+    };
+
+    const preview = [
+      "DRAFT - Bill Preview",
+      "",
+      `Vendor: ${vendorRef.name}`,
+      `Date: ${txn_date}`,
+      `Due Date: ${due_date || "(none)"}`,
+      `Ref no.: ${doc_number || "(auto-assign)"}`,
+      `Department: ${departmentRef?.name || "(none)"}`,
+      `AP Account: ${apAccountRef?.name || "(default)"}`,
+      `Memo: ${memo || "(none)"}`,
+      `Total: $${formatDollars(totalCents)}`,
+      "",
+      "Lines:",
+      ...resolvedLines.map(l =>
+        `  ${formatAccount(l)}: $${l.amount.toFixed(2)}${l.description ? ` "${l.description}"` : ""}`
+      ),
+      "",
+      "Set draft=false to create this bill.",
+    ].join("\n");
+
+    return {
+      content: [{ type: "text", text: preview }],
+    };
+  }
+
+  // Create the bill
+  const result = await promisify<unknown>((cb) =>
+    client.createBill(billObject, cb)
+  ) as { Id: string; DocNumber?: string };
+
+  const qboUrl = `https://app.qbo.intuit.com/app/bill?txnId=${result.Id}`;
+
+  const response = [
+    "Bill Created!",
+    "",
+    `Vendor: ${vendorRef.name}`,
+    `Ref no.: ${result.DocNumber || "(auto-assigned)"}`,
+    `Date: ${txn_date}`,
+    `Total: $${formatDollars(totalCents)}`,
+    "",
+    `View in QuickBooks: ${qboUrl}`,
+  ].join("\n");
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
 }
 
 export async function handleGetBill(

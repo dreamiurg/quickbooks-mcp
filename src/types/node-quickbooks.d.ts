@@ -54,6 +54,7 @@ declare module "node-quickbooks" {
     findCompanyInfos(criteria: object | string, callback: Callback<unknown>): void;
 
     // Create methods
+    createBill(bill: object, callback: Callback<unknown>): void;
     createJournalEntry(journalEntry: object, callback: Callback<unknown>): void;
 
     // Get methods (single entity by ID)

@@ -62,6 +62,15 @@ Names are auto-resolved to IDs using cached lookups:
 | Money utilities | `src/utils/money.ts` |
 | API client | `src/client/quickbooks.ts` |
 
+## Critical Limitations
+
+### Expenses Cannot Split Across Departments
+
+QBO expenses (Purchases) only support **one department at the header level**. You cannot create an expense with lines in different departments. If a charge covers multiple locations:
+- **Do NOT try to edit expense lines** — `edit_expense` with line changes strips `DepartmentRef` and `EntityRef` (vendor) from the header due to a bug in the full-update code path.
+- **Use a reclassification JE** to move amounts between departments after the fact.
+- **Use the bill-splitting workflow** (frontend) to create separate per-department bills from a single vendor invoice.
+
 ## Building and Testing
 
 ```bash
