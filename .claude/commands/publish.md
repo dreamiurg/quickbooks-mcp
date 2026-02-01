@@ -34,17 +34,25 @@ If no argument is provided, ask the user which bump type they want (patch, minor
 
 ### 5. Publish to npm
 
-- Run `npm publish`.
-- Verify it succeeds. If it fails, inform the user but continue to try the remaining steps.
+npm publish requires passkey authentication via browser. Do NOT run `npm publish` directly — it will fail waiting for interactive auth.
 
-### 6. Publish to MCP Registry
+Instead:
+- Tell the user to run `npm publish` themselves in their terminal.
+- Wait for the user to confirm it succeeded before continuing.
 
-- Run `mcp-publisher publish` from the repo root.
-- If it fails (e.g., expired token), inform the user they may need to run `mcp-publisher login github` to re-authenticate, but don't block on this.
-
-### 7. Push to GitHub
+### 6. Push to GitHub
 
 - Run `git push && git push --tags`.
+
+### 7. Publish to MCP Registry
+
+- Run `mcp-publisher publish` from the repo root.
+- If it fails with a 401/expired token, tell the user to re-authenticate and publish manually:
+  ```
+  mcp-publisher login github
+  mcp-publisher publish
+  ```
+- Wait for the user to confirm before continuing.
 
 ### 8. Summary
 
