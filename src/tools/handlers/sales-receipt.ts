@@ -16,7 +16,6 @@ interface SalesReceiptLineChange {
   qty?: number;
   unit_price?: number;
   description?: string;
-  department_name?: string;  // maps to ClassRef on existing lines
   delete?: boolean;
 }
 
@@ -201,17 +200,6 @@ export async function handleEditSalesReceipt(
   let finalLines = [...((updated.Line as typeof current.Line) || current.Line)];
 
   if (lineChanges && lineChanges.length > 0) {
-    const deptCache = await getDepartmentCache(client);
-
-    const resolveDept = (name: string) => {
-      let match = deptCache.byName.get(name.toLowerCase());
-      if (!match) match = deptCache.items.find(d =>
-        d.FullyQualifiedName?.toLowerCase().includes(name.toLowerCase())
-      );
-      if (!match) throw new Error(`Department not found: "${name}"`);
-      return { value: match.Id, name: match.FullyQualifiedName || match.Name };
-    };
-
     for (const change of lineChanges) {
       if (change.line_id) {
         const lineIndex = finalLines.findIndex(l => l.Id === change.line_id);
@@ -228,7 +216,6 @@ export async function handleEditSalesReceipt(
             Qty?: number;
             UnitPrice?: number;
             ItemAccountRef?: { value: string; name?: string };
-            ClassRef?: { value: string; name?: string };
             TaxCodeRef?: { value: string; name?: string };
           };
 
@@ -241,9 +228,6 @@ export async function handleEditSalesReceipt(
             }
           }
           if (change.description !== undefined) line.Description = change.description;
-          if (change.department_name !== undefined) {
-            (detail as Record<string, unknown>).ClassRef = resolveDept(change.department_name);
-          }
 
           line.SalesItemLineDetail = detail as typeof line.SalesItemLineDetail;
           line.DetailType = 'SalesItemLineDetail';
