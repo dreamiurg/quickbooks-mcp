@@ -10,7 +10,7 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // Look for .env in the package root (one level up from dist/)
-config({ path: join(__dirname, "..", ".env") });
+config({ path: join(__dirname, "..", ".env"), quiet: true });
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { server } from "./server.js";
