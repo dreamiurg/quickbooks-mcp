@@ -1158,14 +1158,167 @@ export const toolDefinitions = [
     },
   },
   {
+    name: "create_vendor_credit",
+    description: "Create a vendor credit. Accepts vendor/account/department names (will lookup IDs automatically). Lines represent credit amounts applied to expense accounts. Returns credit details and a link to view in QuickBooks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vendor_name: {
+          type: "string",
+          description: "Vendor display name (e.g., 'Acme Corp'). Will be looked up to get ID.",
+        },
+        vendor_id: {
+          type: "string",
+          description: "Vendor ID (use if you already know it, otherwise use vendor_name)",
+        },
+        txn_date: {
+          type: "string",
+          description: "Transaction date in YYYY-MM-DD format",
+        },
+        department_name: {
+          type: "string",
+          description: "Header-level department/location name (e.g., '20358', 'Cotati'). Will be looked up to get ID.",
+        },
+        department_id: {
+          type: "string",
+          description: "Header-level department/location ID (use if you already know it, otherwise use department_name)",
+        },
+        ap_account: {
+          type: "string",
+          description: "Accounts Payable account name or number (optional, defaults to standard AP)",
+        },
+        memo: {
+          type: "string",
+          description: "Private memo for the vendor credit",
+        },
+        doc_number: {
+          type: "string",
+          description: "Reference number for the vendor credit (optional)",
+        },
+        lines: {
+          type: "array",
+          description: "Array of line items. Each line credits an expense account.",
+          items: {
+            type: "object",
+            properties: {
+              amount: {
+                type: "number",
+                description: "Line amount (positive number)",
+              },
+              account_name: {
+                type: "string",
+                description: "Account name or number (e.g., '5000 Cost of Goods Sold'). Will be looked up to get ID.",
+              },
+              account_id: {
+                type: "string",
+                description: "Account ID (use if you already know it, otherwise use account_name)",
+              },
+              description: {
+                type: "string",
+                description: "Line description (optional)",
+              },
+            },
+            required: ["amount"],
+          },
+        },
+        draft: {
+          type: "boolean",
+          description: "If true, validate and show preview without creating (default: true)",
+        },
+      },
+      required: ["txn_date", "lines"],
+    },
+  },
+  {
+    name: "get_vendor_credit",
+    description: "Fetch a single vendor credit by ID with full details including SyncToken (needed for edits). Returns vendor, date, memo, ref number, AP account, and line details showing expense accounts and amounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The vendor credit ID",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "edit_vendor_credit",
+    description: "Modify an existing vendor credit. Can update vendor, date, memo, ref number, and/or lines. For lines: provide line_id to update existing line, omit line_id to add new line (requires amount and account_name), set delete=true to remove.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "Vendor Credit ID to edit",
+        },
+        vendor_name: {
+          type: "string",
+          description: "New vendor display name (auto-resolved to ID)",
+        },
+        txn_date: {
+          type: "string",
+          description: "New transaction date in YYYY-MM-DD format (optional)",
+        },
+        memo: {
+          type: "string",
+          description: "New private memo (optional)",
+        },
+        doc_number: {
+          type: "string",
+          description: "New reference number (optional)",
+        },
+        lines: {
+          type: "array",
+          description: "Line modifications. Provide line_id to update existing line, omit to add new line.",
+          items: {
+            type: "object",
+            properties: {
+              line_id: {
+                type: "string",
+                description: "ID of existing line to update (omit for new line)",
+              },
+              amount: {
+                type: "number",
+                description: "Line amount (positive number)",
+              },
+              account_name: {
+                type: "string",
+                description: "Account name or number (auto-resolved to ID)",
+              },
+              description: {
+                type: "string",
+                description: "Line description",
+              },
+              department_name: {
+                type: "string",
+                description: "Line-level department/location name (auto-resolved to ID)",
+              },
+              delete: {
+                type: "boolean",
+                description: "Set true to remove this line (requires line_id)",
+              },
+            },
+          },
+        },
+        draft: {
+          type: "boolean",
+          description: "If true, validate and show preview without saving (default: true)",
+        },
+      },
+      required: ["id"],
+    },
+  },
+  {
     name: "delete_entity",
-    description: "Permanently delete a QuickBooks transaction. Supports journal entries, bills, invoices, deposits, sales receipts, and expenses. Uses a two-step flow: first call previews what will be deleted, second call with confirm=true executes the deletion. Note: Customers cannot be deleted — use edit_customer with active=false to deactivate instead.",
+    description: "Permanently delete a QuickBooks transaction. Supports journal entries, bills, invoices, deposits, sales receipts, expenses, and vendor credits. Uses a two-step flow: first call previews what will be deleted, second call with confirm=true executes the deletion. Note: Customers cannot be deleted — use edit_customer with active=false to deactivate instead.",
     inputSchema: {
       type: "object",
       properties: {
         entity_type: {
           type: "string",
-          enum: ["journal_entry", "bill", "invoice", "deposit", "sales_receipt", "expense"],
+          enum: ["journal_entry", "bill", "invoice", "deposit", "sales_receipt", "expense", "vendor_credit"],
           description: "The type of entity to delete.",
         },
         id: {

@@ -61,6 +61,7 @@ declare module "node-quickbooks" {
     createSalesReceipt(salesReceipt: object, callback: Callback<unknown>): void;
     createInvoice(invoice: object, callback: Callback<unknown>): void;
     createCustomer(customer: object, callback: Callback<unknown>): void;
+    createVendorCredit(vendorCredit: object, callback: Callback<unknown>): void;
 
     // Get methods (single entity by ID)
     getJournalEntry(id: string, callback: Callback<unknown>): void;
@@ -70,6 +71,7 @@ declare module "node-quickbooks" {
     getInvoice(id: string, callback: Callback<unknown>): void;
     getDeposit(id: string, callback: Callback<unknown>): void;
     getCustomer(id: string, callback: Callback<unknown>): void;
+    getVendorCredit(id: string, callback: Callback<unknown>): void;
 
     // Update methods
     updateJournalEntry(journalEntry: object, callback: Callback<unknown>): void;
@@ -79,6 +81,7 @@ declare module "node-quickbooks" {
     updateInvoice(invoice: object, callback: Callback<unknown>): void;
     updateDeposit(deposit: object, callback: Callback<unknown>): void;
     updateCustomer(customer: object, callback: Callback<unknown>): void;
+    updateVendorCredit(vendorCredit: object, callback: Callback<unknown>): void;
 
     // Delete methods
     deleteJournalEntry(idOrEntity: object | string, callback: Callback<unknown>): void;
@@ -87,6 +90,7 @@ declare module "node-quickbooks" {
     deleteDeposit(idOrEntity: object | string, callback: Callback<unknown>): void;
     deleteSalesReceipt(idOrEntity: object | string, callback: Callback<unknown>): void;
     deletePurchase(idOrEntity: object | string, callback: Callback<unknown>): void;
+    deleteVendorCredit(idOrEntity: object | string, callback: Callback<unknown>): void;
 
     // Reports
     reportBalanceSheet(options: object, callback: Callback<unknown>): void;
