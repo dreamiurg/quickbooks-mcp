@@ -266,6 +266,7 @@ The server needs these AWS permissions:
 | `get_balance_sheet` | Balance Sheet report |
 | `get_trial_balance` | Trial Balance report |
 | `query_account_transactions` | All transactions affecting a specific account |
+| `account_period_summary` | Period summary for an account (opening/closing balance, debits, credits, count) |
 | **Journal Entries** | |
 | `create_journal_entry` | Create a journal entry (validates debits = credits) |
 | `get_journal_entry` | Fetch a journal entry by ID |

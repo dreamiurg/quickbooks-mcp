@@ -168,6 +168,36 @@ export const toolDefinitions = [
     }
   },
   {
+    name: "account_period_summary",
+    description: "Get a period summary for an account: opening balance, total debits/credits, closing balance, and transaction count. Uses the General Ledger report. Supports department filtering.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        account: {
+          type: "string",
+          description: "Account name, number (AcctNum), or ID",
+        },
+        start_date: {
+          type: "string",
+          description: "Start date YYYY-MM-DD (default: start of year)",
+        },
+        end_date: {
+          type: "string",
+          description: "End date YYYY-MM-DD (default: today)",
+        },
+        department: {
+          type: "string",
+          description: "Filter to specific department/location (optional)",
+        },
+        accounting_method: {
+          type: "string",
+          description: "Accounting method: 'Accrual' (default) or 'Cash'",
+        },
+      },
+      required: ["account"],
+    },
+  },
+  {
     name: "create_journal_entry",
     description: "Create a journal entry. Accepts account/department names (will lookup IDs automatically). Validates debits=credits before creating. Returns entry details and a link to view in QuickBooks.",
     inputSchema: {
