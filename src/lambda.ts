@@ -169,7 +169,7 @@ function oauthServerMetadata(event: APIGatewayEvent): APIGatewayResult {
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
-    scopes_supported: MCP_SCOPE ? [MCP_SCOPE] : [],
+    scopes_supported: MCP_SCOPE ? [MCP_SCOPE, "offline_access"] : [],
   };
 
   return {
@@ -190,15 +190,26 @@ function handleAuthorize(event: APIGatewayEvent): APIGatewayResult {
   for (const [key, value] of Object.entries(qs)) {
     if (!value) continue;
     if (key === "scope") {
-      // Replace Claude's default scope with our Azure AD scope
-      params.set("scope", MCP_SCOPE || value);
+      // Replace client scope with our Azure AD scope, preserving offline_access
+      // so Azure AD issues a refresh token for longer sessions
+      const requestedScopes = value.split(" ");
+      const hasOfflineAccess = requestedScopes.includes("offline_access");
+      const scope = MCP_SCOPE
+        ? hasOfflineAccess ? `${MCP_SCOPE} offline_access` : MCP_SCOPE
+        : value;
+      params.set("scope", scope);
+    } else if (key === "prompt" && value === "consent") {
+      // Don't forward prompt=consent — our tenant policy blocks consent for
+      // unverified publisher apps (like Claude's DCR client). Admin consent
+      // is already granted, so we can safely use "select_account" instead.
+      params.set("prompt", "select_account");
     } else {
       params.set(key, value);
     }
   }
   // Ensure scope is set even if not in the original request
   if (!params.has("scope") && MCP_SCOPE) {
-    params.set("scope", MCP_SCOPE);
+    params.set("scope", `${MCP_SCOPE} offline_access`);
   }
 
   const redirectUrl = `${AZURE_AUTHORIZE_URL}?${params.toString()}`;
@@ -221,10 +232,12 @@ async function handleToken(event: APIGatewayEvent): Promise<APIGatewayResult> {
     body = Buffer.from(body, "base64").toString("utf-8");
   }
 
-  // Parse form body and replace scope
+  // Parse form body and replace scope, preserving offline_access for refresh tokens
   const params = new URLSearchParams(body);
   if (MCP_SCOPE) {
-    params.set("scope", MCP_SCOPE);
+    const currentScope = params.get("scope") || "";
+    const hasOfflineAccess = currentScope.split(" ").includes("offline_access");
+    params.set("scope", hasOfflineAccess ? `${MCP_SCOPE} offline_access` : MCP_SCOPE);
   }
 
   const response = await fetch(AZURE_TOKEN_URL, {
@@ -252,7 +265,7 @@ async function handleToken(event: APIGatewayEvent): Promise<APIGatewayResult> {
 function resourceMetadataResponse(event: APIGatewayEvent): APIGatewayResult {
   const resourceUrl = getPublicUrl(event);
   const resourceName = process.env.MCP_RESOURCE_NAME || "QuickBooks MCP Server";
-  const scopesSupported = MCP_SCOPE ? [MCP_SCOPE] : [];
+  const scopesSupported = MCP_SCOPE ? [MCP_SCOPE, "offline_access"] : [];
 
   return {
     statusCode: 200,
