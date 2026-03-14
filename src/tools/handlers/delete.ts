@@ -144,9 +144,14 @@ export async function handleDeleteEntity(
     };
   }
 
-  // Execute delete
+  // Fetch entity first to get the current SyncToken (required by QBO API)
+  const entity = await promisify<Record<string, unknown>>((cb) =>
+    (client as any)[config.getMethod](id, cb)
+  );
+
+  // Execute delete — QBO requires both Id and SyncToken in the request body
   await promisify<unknown>((cb) =>
-    (client as any)[config.deleteMethod]({ Id: id }, cb)
+    (client as any)[config.deleteMethod]({ Id: id, SyncToken: entity.SyncToken }, cb)
   );
 
   return {
